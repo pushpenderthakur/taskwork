@@ -54,14 +54,14 @@ export function refreshCookieOptions() {
   };
 }
 
-/** Access cookie mirrors the 15 minute access-token lifetime. */
+/** Access cookie mirrors the access-token lifetime (`ACCESS_TOKEN_TTL`). */
 export function accessCookieOptions() {
   return {
     httpOnly: true,
     secure: env.isProduction,
     sameSite: env.isProduction ? 'none' : 'lax',
     path: '/',
-    maxAge: 15 * 60 * 1000,
+    maxAge: env.accessTokenTtlMs,
   };
 }
 

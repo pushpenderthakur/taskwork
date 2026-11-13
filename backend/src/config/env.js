@@ -63,6 +63,15 @@ function readSecret(name, { devFallbackLabel }) {
   return generated;
 }
 
+/** Duration like `15m`, `900s` or `900` (seconds) in milliseconds. */
+function readDurationMs(name, fallbackMs) {
+  const match = /^(\d+)\s*(ms|s|m|h|d)?$/.exec(readString(name, ''));
+  if (!match) return fallbackMs;
+
+  const factor = { ms: 1, s: 1000, m: 60_000, h: 3_600_000, d: 86_400_000 }[match[2] ?? 's'];
+  return Number(match[1]) * factor;
+}
+
 const nodeEnv = readString('NODE_ENV', 'development');
 const port = readInt('PORT', 5000);
 
@@ -113,6 +122,8 @@ export const env = {
   accessTokenSecret: readSecret('JWT_ACCESS_SECRET', { devFallbackLabel: 'access token secret' }),
   refreshTokenSecret: readSecret('JWT_REFRESH_SECRET', { devFallbackLabel: 'refresh token secret' }),
   accessTokenTtl: readString('ACCESS_TOKEN_TTL', '15m'),
+  // The access-token cookie has to expire with the token it carries.
+  accessTokenTtlMs: readDurationMs('ACCESS_TOKEN_TTL', 15 * 60 * 1000),
   refreshTokenTtlDays: readInt('REFRESH_TOKEN_TTL_DAYS', 7),
   refreshTokenTtlMs: readInt('REFRESH_TOKEN_TTL_DAYS', 7) * 24 * 60 * 60 * 1000,
   otpTtlSeconds: readInt('OTP_TTL_SECONDS', 300),

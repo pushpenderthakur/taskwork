@@ -79,8 +79,8 @@ Run from the repository root:
 ## Tests
 
 ```bash
-npm run test:api    # 73 checks: OTP, sessions, Apple, Gmail, Twilio, CORS, guards
-npm run test:ui     # 15 checks: register, OTP resend, sign-out, phone sign-in
+npm run test:api    # 76 checks: OTP, sessions, Apple, Gmail, Twilio, CORS, guards
+npm run test:ui     # 17 checks: register, OTP resend, sign-out, phone, expiry
 ```
 
 The smoke suite boots an in-memory MongoDB, starts the real Express app, signs

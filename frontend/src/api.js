@@ -12,6 +12,15 @@ import { API_URL } from './config';
 const TOKEN_STORAGE_KEY = 'taskwork.token';
 const USER_STORAGE_KEY = 'taskwork.user';
 
+/**
+ * Broadcast after the session is dropped because the refresh failed.
+ *
+ * The cached user lives in React state as well as in localStorage, so the tree
+ * has to be told to fall back to the sign-in form instead of showing a dashboard
+ * whose every request now fails.
+ */
+export const SIGNED_OUT_EVENT = 'taskwork:signed-out';
+
 export const api = axios.create({
   // Empty in mock mode: relative URLs then hit the dev server.
   baseURL: API_URL || undefined,
@@ -52,6 +61,12 @@ export function clearSession() {
   localStorage.removeItem(USER_STORAGE_KEY);
 }
 
+/** Drops the session and notifies the UI. */
+function dropSession() {
+  clearSession();
+  window.dispatchEvent(new Event(SIGNED_OUT_EVENT));
+}
+
 /** Cached user, or null when missing or corrupted. */
 export function getStoredUser() {
   const raw = localStorage.getItem(USER_STORAGE_KEY);
@@ -82,7 +97,8 @@ api.interceptors.response.use(
       config.headers = { ...config.headers, Authorization: `Bearer ${data.accessToken}` };
       return api.request(config);
     } catch {
-      clearSession();
+      // The refresh cookie is gone or expired: the session is over everywhere.
+      dropSession();
       return Promise.reject(error);
     }
   },

@@ -305,6 +305,29 @@ try {
     phoneDone.slice(0, 200),
   );
 
+  // Simulates an expired session server side: the cookies are gone and the
+  // cached access token is rejected, so the SPA must fall back to the sign-in
+  // form instead of sitting on a dashboard whose every request fails.
+  await send('Storage.clearCookies');
+  await evaluate('localStorage.removeItem("taskwork.token")');
+  const refreshClicked = await evaluate(`(() => {
+    const button = [...document.querySelectorAll('button')].find(
+      (b) => b.title === 'Refresh profile',
+    );
+    button?.click();
+    return Boolean(button);
+  })()`);
+  check('profile refresh is available', refreshClicked);
+  const bounced = await waitFor(
+    async () => (await evaluate(`document.body.innerText`))?.includes('Welcome Back'),
+    { timeout: 10000 },
+  );
+  check(
+    'an expired session returns to the sign-in form',
+    bounced,
+    await evaluate(`document.body.innerText.slice(0, 120)`),
+  );
+
   ws.close();
   const failed = checks.filter((entry) => !entry.ok);
   console.log(`\n${checks.length - failed.length}/${checks.length} UI checks passed\n`);

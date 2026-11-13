@@ -111,6 +111,9 @@ process.env.MONGODB_URI = mongod.getUri('taskwork-smoke');
 const { connectDb, disconnectDb } = await import('../src/config/db.js');
 const { createApp } = await import('../src/app.js');
 const { Otp } = await import('../src/models/Otp.js');
+const { generateOtpCode } = await import('../src/utils/otp.js');
+const { accessCookieOptions } = await import('../src/utils/tokens.js');
+const { env: appEnv } = await import('../src/config/env.js');
 
 // The mailer/sms helpers print the OTP in development; capture it here.
 const otpLogPattern = /OTP for .*?(\d{6})/;
@@ -271,6 +274,23 @@ try {
 
   const noOrigin = await fetch(`${baseUrl}/api/health`);
   check('a request without an Origin is allowed', noOrigin.status === 200, `status ${noOrigin.status}`);
+
+  // Codes must stay 6 digits (leading zeros included) and come from the CSPRNG,
+  // so two draws are effectively never the same.
+  const generated = new Set(Array.from({ length: 200 }, () => generateOtpCode()));
+  check(
+    'generated codes are 6 digits',
+    [...generated].every((code) => /^\d{6}$/.test(code)),
+    [...generated].find((code) => !/^\d{6}$/.test(code)),
+  );
+  check('generated codes vary', generated.size > 1, `distinct ${generated.size}`);
+
+  // The access cookie has to expire with the token it carries.
+  check(
+    'the access cookie matches ACCESS_TOKEN_TTL',
+    accessCookieOptions().maxAge === appEnv.accessTokenTtlMs,
+    `${accessCookieOptions().maxAge} vs ${appEnv.accessTokenTtlMs}`,
+  );
 
   const unknownLogin = await call('/api/auth/send-otp', {
     method: 'POST',

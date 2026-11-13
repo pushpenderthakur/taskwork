@@ -5,15 +5,21 @@
  * does not reveal live codes.
  */
 import bcrypt from 'bcryptjs';
+import crypto from 'node:crypto';
+import { env } from '../config/env.js';
 
 const OTP_LENGTH = 6;
 const BCRYPT_ROUNDS = 10;
 
-/** Uniformly distributed 6 digit code, leading zeros included. */
+/**
+ * Uniformly distributed 6 digit code, leading zeros included.
+ *
+ * `randomInt` draws from the platform CSPRNG: a predictable code would make the
+ * 5-attempt lockout and the 10 minute TTL the only thing standing between an
+ * attacker and an account.
+ */
 export function generateOtpCode() {
-  const max = 10 ** OTP_LENGTH;
-  const value = Math.floor(Math.random() * max);
-  return value.toString().padStart(OTP_LENGTH, '0');
+  return crypto.randomInt(0, 10 ** OTP_LENGTH).toString().padStart(OTP_LENGTH, '0');
 }
 
 export function hashOtp(code) {
@@ -42,7 +48,9 @@ export function maskIdentifier(method, identifier) {
     const visible = local.slice(0, 2);
     return `${visible}${'*'.repeat(Math.max(local.length - 2, 1))}@${domain}`;
   }
-  return `+91 ${identifier.slice(0, 2)}****${identifier.slice(-2)}`;
+  // The stored form is the last 10 digits, so the country code comes from config
+  // rather than being hardcoded to +91.
+  return `+${env.sms.countryCode} ${identifier.slice(0, 2)}****${identifier.slice(-2)}`;
 }
 
 /** Absolute expiry for a code with the given time to live. */
