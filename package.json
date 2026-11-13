@@ -2,17 +2,17 @@
   "name": "taskwork",
   "private": true,
   "scripts": {
-    "dev": "npm --prefix taskwork run dev",
-    "dev:server": "npm --prefix server run dev",
+    "dev": "npm --prefix frontend run dev",
+    "dev:server": "npm --prefix backend run dev",
     "dev:all": "concurrently -n web,api -c blue,green \"npm run dev\" \"npm run dev:server\"",
-    "build": "npm --prefix taskwork run build",
-    "lint": "npm --prefix taskwork run lint",
-    "preview": "npm --prefix taskwork run preview",
-    "test:api": "npm --prefix server run test:smoke",
-    "test:ui": "node taskwork/scripts/ui-check.mjs",
+    "build": "npm --prefix frontend run build",
+    "lint": "npm --prefix frontend run lint",
+    "preview": "npm --prefix frontend run preview",
+    "test:api": "npm --prefix backend run test:smoke",
+    "test:ui": "node frontend/scripts/ui-check.mjs",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
-    "db:dev": "npm --prefix server run db:dev"
+    "db:dev": "npm --prefix backend run db:dev"
   },
   "devDependencies": {
     "concurrently": "^10.0.7"

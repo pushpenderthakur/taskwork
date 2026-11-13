@@ -1,0 +1,7 @@
+/*
+ * Tailwind v4 entry point.
+ *
+ * A single import pulls in the framework; component styles are utility classes,
+ * so there is no hand-written CSS layer here.
+ */
+@import 'tailwindcss';
