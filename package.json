@@ -12,6 +12,7 @@
     "test:ui": "node frontend/scripts/ui-check.mjs",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
+    "mail:up": "docker compose up -d mail",
     "db:dev": "npm --prefix backend run db:dev"
   },
   "devDependencies": {

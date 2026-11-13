@@ -13,5 +13,24 @@ services:
       timeout: 5s
       retries: 5
 
+  # Local SMTP catcher: OTP emails land in the web UI instead of being printed to
+  # the console. SMTP on 1025, inbox on http://localhost:8025 (no auth needed).
+  mail:
+    image: axllent/mailpit:latest
+    container_name: taskwork-mail
+    restart: unless-stopped
+    ports:
+      - '1025:1025'
+      - '8025:8025'
+    environment:
+      MP_MAX_MESSAGES: 500
+      MP_SMTP_AUTH_ACCEPT_ANY: 'true'
+      MP_SMTP_AUTH_ALLOW_INSECURE: 'true'
+    healthcheck:
+      test: ['CMD', 'wget', '--quiet', '--spider', 'http://localhost:8025/api/v1/info']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   mongo-data:

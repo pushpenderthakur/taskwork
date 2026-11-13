@@ -55,8 +55,38 @@ configuration hint instead of opening a popup.
 
 Email and SMS credentials are optional: without them OTP codes are printed to
 the server console and returned as `devCode` outside production, so the whole
-flow stays testable locally. See [`backend/README.md`](backend/README.md) for the
-Gmail App Password and Twilio setup.
+flow stays testable locally. For a real inbox without Gmail credentials, start
+Mailpit and point the API at it:
+
+```bash
+npm run mail:up                    # SMTP on :1025, inbox on http://localhost:8025
+
+# backend/.env
+SMTP_HOST=127.0.0.1
+SMTP_PORT=1025
+SMTP_SECURE=false
+```
+
+Every code then arrives as a normal email in the Mailpit UI, and `devCode` stops
+being needed. See [`backend/README.md`](backend/README.md) for the Gmail App
+Password and Twilio setup.
+
+### Social sign-in requirements
+
+- **Google**: put the same value in `GOOGLE_CLIENT_ID` (server) and
+  `VITE_GOOGLE_CLIENT_ID` (SPA), and add `http://localhost:5173` to the OAuth
+  client's *Authorized JavaScript origins*. The server re-checks the token's
+  audience against `GOOGLE_CLIENT_ID`, so a mismatch is a `401
+  GOOGLE_TOKEN_AUDIENCE_MISMATCH`, not a silent failure.
+- **Apple**: set `APPLE_CLIENT_ID`/`VITE_APPLE_CLIENT_ID` to the **Services ID**
+  (not the App ID), register the exact origin as a Return URL on that Services
+  ID, and serve the SPA over HTTPS — Apple rejects `localhost` and `http://`.
+  Without a client ID the server answers `503 APPLE_NOT_CONFIGURED` and the
+  button says what to set.
+
+Both buttons map the provider error codes to actionable text (blocked popup,
+blocked third-party cookies, unauthorised origin, rejected client ID), so a
+failed attempt names the setting that is wrong.
 
 ## Scripts
 

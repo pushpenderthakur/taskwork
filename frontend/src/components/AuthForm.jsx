@@ -27,8 +27,16 @@ function googleErrorMessage(reason) {
     case 'token_initialization_failed':
     case 'oauth_initialization_failed':
       return 'Google sign-in is not allowed for this origin. Add it to the OAuth client’s authorized JavaScript origins.';
+    case 'idpiframe_initialization_failed':
+    case 'idpiframe_load_failed':
+      // Chrome's storage partitioning is the usual cause: GIS needs to read
+      // third-party cookies from accounts.google.com to size its iframe.
+      return 'Google sign-in needs third-party cookies. Allow them for accounts.google.com (or use a browser without strict tracking protection) and try again.';
+    case 'invalid_client':
+      return 'Google rejected the client ID. Check VITE_GOOGLE_CLIENT_ID and GOOGLE_CLIENT_ID match.';
     default:
-      return 'Google sign-in failed, please try again.';
+      // The raw code is the only lead when GIS reports something unexpected.
+      return `Google sign-in failed${reason ? ` (${reason})` : ''}, please try again.`;
   }
 }
 

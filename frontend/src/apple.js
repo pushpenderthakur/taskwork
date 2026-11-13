@@ -70,9 +70,9 @@ export async function signInWithApple({ clientId }) {
   return { identityToken, name: fullName || undefined };
 }
 
-/** Maps Apple SDK errors (cancel, blocked popup) to user-facing text. */
+/** Maps Apple SDK errors (cancel, blocked popup, bad config) to user text. */
 export function appleErrorMessage(error) {
-  const code = typeof error === 'string' ? error : error?.error;
+  const code = typeof error === 'string' ? error : (error?.error ?? error?.code);
 
   switch (code) {
     case 'popup_closed_by_user':
@@ -81,7 +81,14 @@ export function appleErrorMessage(error) {
       return 'Apple sign-in was cancelled.';
     case 'popup_blocked':
       return 'The Apple sign-in popup was blocked. Allow popups and try again.';
+    case 'not_supported':
+      return 'This browser cannot open Apple sign-in. Try another browser.';
+    case 'invalid_client':
+      // Apple rejects the client ID when it is not the Services ID, or when the
+      // current origin is not a Return URL on that Services ID.
+      return 'Apple rejected this client ID. Check VITE_APPLE_CLIENT_ID and that this origin is a Return URL on the Services ID.';
     default:
-      return 'Apple sign-in failed, please try again.';
+      // The raw code is the only lead when the SDK reports something unexpected.
+      return `Apple sign-in failed${code ? ` (${code})` : ''}, please try again.`;
   }
 }

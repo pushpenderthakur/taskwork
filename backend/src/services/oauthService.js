@@ -103,7 +103,8 @@ export function normalizeAppleName(name) {
  * Verifies an Apple identity token (a JWT) against Apple's published JWKS.
  */
 export async function verifyAppleIdentityToken(identityToken) {
-  if (!env.appleClientId) {
+  const appleClientId = env.appleClientId;
+  if (!appleClientId || appleClientId.startsWith('your_')) {
     throw new ApiError(
       503,
       'APPLE_NOT_CONFIGURED',
@@ -115,7 +116,7 @@ export async function verifyAppleIdentityToken(identityToken) {
   try {
     ({ payload } = await jwtVerify(identityToken, appleJwks, {
       issuer: env.appleIssuer,
-      audience: env.appleClientId,
+      audience: appleClientId,
       algorithms: ['RS256'],
     }));
   } catch {
