@@ -103,6 +103,17 @@ export const env = {
   // Overridable only so the identity token flow can be tested offline.
   appleIssuer: readString('APPLE_ISSUER', 'https://appleid.apple.com'),
   appleJwksUrl: readString('APPLE_JWKS_URL', 'https://appleid.apple.com/auth/keys'),
+  sms: {
+    provider: readString('SMS_PROVIDER', '').toLowerCase(),
+    countryCode: readString('SMS_COUNTRY_CODE', '91'),
+  },
+  twilio: {
+    accountSid: readString('TWILIO_ACCOUNT_SID', ''),
+    authToken: readString('TWILIO_AUTH_TOKEN', ''),
+    from: readString('TWILIO_FROM', ''),
+    // Overridable only so the provider call can be tested offline.
+    apiBase: readString('TWILIO_API_BASE', 'https://api.twilio.com/2010-04-01/Accounts'),
+  },
   smtp: resolveSmtp(),
 };
 

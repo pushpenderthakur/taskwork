@@ -9,6 +9,7 @@
     "lint": "npm --prefix taskwork run lint",
     "preview": "npm --prefix taskwork run preview",
     "test:api": "npm --prefix server run test:smoke",
+    "test:ui": "node taskwork/scripts/ui-check.mjs",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
     "db:dev": "npm --prefix server run db:dev"

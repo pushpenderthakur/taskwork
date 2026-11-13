@@ -65,6 +65,7 @@ network calls.
 | `npm run build`   | Production build into `dist/`     |
 | `npm run preview` | Preview the production build      |
 | `npm run lint`    | Run ESLint                        |
+| `npm run test:ui` | Headless-Chrome UI check (dev servers must run) |
 
 ## Structure
 
@@ -79,3 +80,6 @@ src/
   components/AuthForm.jsx  # Login / register / OTP / social login UI
   components/Dashboard.jsx # Profile, linked providers, active sessions
 ```
+
+`scripts/ui-check.mjs` drives the built UI in headless Chrome over the DevTools
+protocol; run it with `npm run test:ui` while `npm run dev` and the API are up.

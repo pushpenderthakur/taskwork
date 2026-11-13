@@ -13,6 +13,31 @@ const ALLOWED_ORIGINS = env.clientOrigin
   .map((origin) => origin.trim())
   .filter(Boolean);
 
+// In production the Google and Apple SDKs need their own script/frame origins;
+// Tailwind and React inject inline styles. Keep this in sync with whatever
+// serves the built SPA (the API only sets headers on its own responses).
+function securityHeaders() {
+  if (!env.isProduction) return helmet();
+
+  return helmet({
+    contentSecurityPolicy: {
+      useDefaults: true,
+      directives: {
+        'script-src': [
+          "'self'",
+          'https://accounts.google.com',
+          'https://www.gstatic.com',
+          'https://appleid.cdn-apple.com',
+        ],
+        'style-src': ["'self'", "'unsafe-inline'"],
+        'img-src': ["'self'", 'data:', 'https://www.svgrepo.com'],
+        'connect-src': ["'self'", 'https://appleid.apple.com'],
+        'frame-src': ['https://accounts.google.com', 'https://appleid.apple.com'],
+      },
+    },
+  });
+}
+
 export function createApp() {
   const app = express();
 
@@ -20,7 +45,7 @@ export function createApp() {
   // Rate limiting and secure cookies need the real client IP behind a proxy.
   app.set('trust proxy', 1);
 
-  app.use(helmet());
+  app.use(securityHeaders());
   app.use(
     cors({
       origin(origin, callback) {

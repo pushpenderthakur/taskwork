@@ -95,8 +95,8 @@ returns `devCode` so the flow can be completed locally without SMTP.
 | 404    | `ACCOUNT_NOT_FOUND`, `ROUTE_NOT_FOUND`                                                   |
 | 409    | `ACCOUNT_EXISTS`, `DUPLICATE`                                                            |
 | 429    | `RATE_LIMITED`                                                                           |
-| 502    | `EMAIL_DELIVERY_FAILED`                                                                  |
-| 503    | `GOOGLE_NOT_CONFIGURED`, `APPLE_NOT_CONFIGURED`                                          |
+| 502    | `EMAIL_DELIVERY_FAILED`, `SMS_DELIVERY_FAILED`                                             |
+| 503    | `GOOGLE_NOT_CONFIGURED`, `APPLE_NOT_CONFIGURED`, `SMS_NOT_CONFIGURED`                     |
 
 ### Email delivery (Gmail)
 
@@ -124,6 +124,25 @@ production, so the flow stays testable locally. A failed send is reported as
 
 Gmail allows roughly 500 recipients per day, so use a transactional provider
 (SES, Postmark, Resend) once real traffic arrives.
+
+### SMS delivery (Twilio)
+
+Phone OTP needs a provider; without one the code is logged and returned as
+`devCode` outside production. Twilio needs an Account SID, Auth Token and a
+sender (phone number or Messaging Service SID):
+
+```env
+SMS_PROVIDER=twilio
+SMS_COUNTRY_CODE=91
+TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TWILIO_AUTH_TOKEN=your_auth_token
+TWILIO_FROM=+15005550006
+```
+
+Numbers are normalised to E.164 with `SMS_COUNTRY_CODE` (the UI collects 10
+digits). A rejected message is `502 SMS_DELIVERY_FAILED` and the unused code is
+discarded; `SMS_PROVIDER=twilio` with incomplete credentials is
+`503 SMS_NOT_CONFIGURED`.
 
 ## Security notes
 

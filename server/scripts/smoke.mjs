@@ -651,6 +651,98 @@ try {
 
   Object.assign(env.smtp, previousSmtp);
 
+  // SMS delivery through a stubbed Twilio API
+  const smsRequests = [];
+  const smsSink = http.createServer((req, res) => {
+    let body = '';
+    req.on('data', (chunk) => {
+      body += chunk;
+    });
+    req.on('end', () => {
+      smsRequests.push({ url: req.url, headers: req.headers, body });
+      if (req.url.startsWith('/fail')) {
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end('{"message":"invalid"}');
+        return;
+      }
+      res.writeHead(201, { 'content-type': 'application/json' });
+      res.end('{"sid":"SM0000","status":"queued"}');
+    });
+  });
+  await new Promise((resolve) => smsSink.listen(0, '127.0.0.1', resolve));
+
+  const previousSms = { ...env.sms };
+  const previousTwilio = { ...env.twilio };
+  const accountSid = 'AC00000000000000000000000000000000';
+  const authToken = 'test-auth-token';
+
+  Object.assign(env.sms, { provider: 'twilio' });
+  Object.assign(env.twilio, {
+    accountSid,
+    authToken,
+    from: '+15005550006',
+    apiBase: `http://127.0.0.1:${smsSink.address().port}/2010-04-01/Accounts`,
+  });
+
+  const smsSend = await call('/api/auth/send-otp', {
+    method: 'POST',
+    body: { method: 'phone', identifier: '9000000001', isLogin: false, name: 'SMS User' },
+  });
+  check('twilio send-otp returns 202', smsSend.status === 202, JSON.stringify(smsSend.json));
+  check(
+    'a delivered SMS is not echoed back as devCode',
+    smsSend.json?.devCode === undefined,
+    JSON.stringify(smsSend.json),
+  );
+
+  const smsRequest = await waitFor(() => smsRequests[0] ?? null);
+  check('the SMS request reached the provider', Boolean(smsRequest), 'no request received');
+
+  const smsParams = new URLSearchParams(smsRequest?.body ?? '');
+  const smsBody = smsParams.get('Body') ?? '';
+  const smsCode = smsBody.match(/code is (\d{6})/)?.[1];
+
+  check(
+    'the SMS goes to the E.164 number',
+    smsParams.get('To') === '+919000000001',
+    smsRequest?.body,
+  );
+  check(
+    'the provider is called with basic auth',
+    smsRequest?.headers?.authorization ===
+      `Basic ${Buffer.from(`${accountSid}:${authToken}`).toString('base64')}`,
+    smsRequest?.headers?.authorization,
+  );
+  check('the SMS carries the OTP code', Boolean(smsCode), smsBody.slice(0, 120));
+
+  const smsVerify = await call('/api/auth/verify-otp', {
+    method: 'POST',
+    body: { method: 'phone', identifier: '9000000001', otp: smsCode },
+  });
+  check(
+    'the texted code signs the user in',
+    smsVerify.status === 200 && smsVerify.json?.user?.phone === '9000000001',
+    JSON.stringify(smsVerify.json),
+  );
+
+  Object.assign(env.twilio, { apiBase: `http://127.0.0.1:${smsSink.address().port}/fail` });
+  const smsFailure = await call('/api/auth/send-otp', {
+    method: 'POST',
+    body: { method: 'phone', identifier: '9000000002', isLogin: false, name: 'SMS Down' },
+  });
+  check(
+    'a rejected SMS is 502 SMS_DELIVERY_FAILED',
+    smsFailure.status === 502 && smsFailure.json?.error?.code === 'SMS_DELIVERY_FAILED',
+    JSON.stringify(smsFailure.json),
+  );
+
+  const smsOrphan = await Otp.findOne({ method: 'phone', identifier: '9000000002' });
+  check('a failed SMS leaves no live OTP', smsOrphan === null, String(smsOrphan));
+
+  Object.assign(env.sms, previousSms);
+  Object.assign(env.twilio, previousTwilio);
+  await new Promise((resolve) => smsSink.close(resolve));
+
   const failed = results.filter((result) => !result.ok);
   console.log(`\n${results.length - failed.length}/${results.length} checks passed\n`);
   process.exitCode = failed.length === 0 ? 0 : 1;
