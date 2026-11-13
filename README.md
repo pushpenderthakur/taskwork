@@ -34,7 +34,7 @@ cp backend/.env.example backend/.env
 cp frontend/.env.example frontend/.env
 
 npm run db:up                      # optional: MongoDB in Docker
-npm run dev:all                    # API on :5000, SPA on :5173
+npm run dev                        # API on :5000, SPA on :5173
 ```
 
 `npm run db:dev` starts a MongoDB that keeps its data in `backend/.data/mongo`
@@ -64,9 +64,9 @@ Run from the repository root:
 
 | Command            | Description                                            |
 | ------------------ | ------------------------------------------------------ |
-| `npm run dev`      | Start the SPA dev server                                |
-| `npm run dev:server` | Start the API with `node --watch`                     |
-| `npm run dev:all`  | Start API and SPA together                              |
+| `npm run dev`      | Start the API and the SPA together (concurrently)       |
+| `npm run dev:server` | Start only the API, with `node --watch`               |
+| `npm run dev:web`  | Start only the SPA dev server                           |
 | `npm run build`    | Production build of the SPA into `frontend/dist`        |
 | `npm run lint`     | ESLint over the frontend and API                        |
 | `npm run preview`  | Serve the built SPA                                     |
@@ -79,7 +79,8 @@ Run from the repository root:
 ## Tests
 
 ```bash
-npm run test:api    # 65 checks: OTP, sessions, Apple, Gmail, Twilio, guards
+npm run test:api    # 69 checks: OTP, sessions, Apple, Gmail, Twilio, guards
+npm run test:ui     # 15 checks: register, OTP resend, sign-out, phone sign-in
 ```
 
 The smoke suite boots an in-memory MongoDB, starts the real Express app, signs
