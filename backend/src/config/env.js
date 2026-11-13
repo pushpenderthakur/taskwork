@@ -129,6 +129,10 @@ export const env = {
   otpTtlSeconds: readInt('OTP_TTL_SECONDS', 300),
   otpMaxAttempts: readInt('OTP_MAX_ATTEMPTS', 5),
   otpResendCooldownSeconds: readInt('OTP_RESEND_COOLDOWN_SECONDS', 30),
+  // Escape hatch for preview deployments without a transport: echo the code in
+  // the response even in production. Off unless explicitly enabled, and logged
+  // loudly at boot, because it lets anyone who can call the API sign in.
+  allowDevOtp: readBool('ALLOW_DEV_OTP', false),
   googleClientId: readString('GOOGLE_CLIENT_ID', ''),
   // Overridable only so the Google verification flow can be tested offline.
   googleTokenInfoUrl: readString(

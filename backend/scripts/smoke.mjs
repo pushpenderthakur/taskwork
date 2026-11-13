@@ -202,11 +202,12 @@ function startSmtpSink() {
   });
 }
 
-async function call(path, { method = 'GET', body, token, cookie } = {}) {
+async function call(path, { method = 'GET', body, token, cookie, origin } = {}) {
   const headers = {};
   if (body) headers['content-type'] = 'application/json';
   if (token) headers.authorization = `Bearer ${token}`;
   if (cookie) headers.cookie = cookie;
+  if (origin) headers.origin = origin;
 
   const response = await fetch(`${baseUrl}${path}`, {
     method,
@@ -291,6 +292,49 @@ try {
     accessCookieOptions().maxAge === appEnv.accessTokenTtlMs,
     `${accessCookieOptions().maxAge} vs ${appEnv.accessTokenTtlMs}`,
   );
+
+  // On a deployment that serves the SPA and the API from one domain (Vercel),
+  // every POST carries the deployment's own Origin, which CLIENT_ORIGIN cannot
+  // list in advance. It must still be allowed.
+  const sameOrigin = await call('/api/auth/send-otp', {
+    method: 'POST',
+    origin: baseUrl,
+    body: { method: 'email', identifier: 'ghost@example.com', isLogin: true },
+  });
+  check(
+    'a same-origin POST is allowed',
+    sameOrigin.status === 404 && sameOrigin.json?.error?.code === 'ACCOUNT_NOT_FOUND',
+    `status ${sameOrigin.status} ${JSON.stringify(sameOrigin.json)}`,
+  );
+
+  // `ALLOW_DEV_OTP` is the escape hatch for a deployment without a mail provider:
+  // codes stay out of responses unless it is explicitly enabled.
+  const flagEmail = `otp.flag.${Date.now()}@example.com`;
+  appEnv.isProduction = true;
+  appEnv.allowDevOtp = false;
+  const quiet = await call('/api/auth/send-otp', {
+    method: 'POST',
+    body: { method: 'email', identifier: flagEmail, isLogin: false, name: 'Flag' },
+  });
+  check(
+    'production hides the dev code',
+    quiet.status === 202 && !quiet.json?.devCode,
+    JSON.stringify(quiet.json),
+  );
+
+  appEnv.allowDevOtp = true;
+  const echoed = await call('/api/auth/send-otp', {
+    method: 'POST',
+    body: { method: 'email', identifier: flagEmail, isLogin: false, name: 'Flag' },
+  });
+  check(
+    'ALLOW_DEV_OTP echoes the code',
+    typeof echoed.json?.devCode === 'string' && /^\d{6}$/.test(echoed.json.devCode),
+    JSON.stringify(echoed.json),
+  );
+
+  appEnv.isProduction = false;
+  appEnv.allowDevOtp = false;
 
   const unknownLogin = await call('/api/auth/send-otp', {
     method: 'POST',

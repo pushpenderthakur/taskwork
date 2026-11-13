@@ -135,8 +135,9 @@ export async function sendOtp({ method, identifier, isLogin, name }) {
 
   // Without a real transport the code only exists in the server console, which
   // makes local development untestable. Hand it back explicitly, outside
-  // production only, so the UI can show it.
-  if (!delivery.delivered && !env.isProduction) {
+  // production only, so the UI can show it. `ALLOW_DEV_OTP` opts in on a
+  // deployment that has no mail provider yet (Vercel previews, demos).
+  if (!delivery.delivered && (!env.isProduction || env.allowDevOtp)) {
     result.devCode = code;
   }
 

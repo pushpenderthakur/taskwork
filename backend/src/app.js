@@ -47,12 +47,26 @@ function securityHeaders() {
   });
 }
 
-// Browsers attach `Origin` to every cross-origin request. Reject origins that are
-// not on the allow-list here, so they get a 403 instead of the 500 that `cors`
-// would produce when its callback receives an error (with a stack trace in the log).
-function originGuard(req, res, next) {
+/**
+ * Browsers attach `Origin` to cross-origin requests (and to same-origin POSTs).
+ * Origins outside `CLIENT_ORIGIN` are rejected here, so they get a 403 instead
+ * of the 500 that `cors` would produce when its callback receives an error.
+ *
+ * The request's own origin is always allowed: the Vercel setup serves the SPA and
+ * the API from one domain, where every POST carries an `Origin` that can never
+ * appear in `CLIENT_ORIGIN` (it is the deployment URL, not the dev server).
+ */
+function isAllowedOrigin(req, origin) {
+  if (!origin) return true;
+  if (ALLOWED_ORIGINS.includes(origin)) return true;
+
+  const host = req.headers.host;
+  return Boolean(host) && origin === `${req.protocol}://${host}`;
+}
+
+function originGuard(req, _res, next) {
   const origin = req.headers.origin;
-  if (origin && !ALLOWED_ORIGINS.includes(origin)) {
+  if (!isAllowedOrigin(req, origin)) {
     return next(
       ApiError.forbidden('ORIGIN_NOT_ALLOWED', `Origin ${origin} is not allowed by CORS.`),
     );

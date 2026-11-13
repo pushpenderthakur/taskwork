@@ -126,14 +126,24 @@ to override).
 - The repository includes a Vercel Services configuration: `/api/*` routes to
   the Express API and all other paths route to the Vite SPA on the same domain.
   Set `VITE_API_BASE_URL=/api/auth` in Vercel so browser requests use that API.
+  (A production build already defaults to `/api/auth` when the variable is
+  missing, so a forgotten value cannot silently disable sign-in.)
+- Because the SPA and the API then share a domain, requests carry the
+  deployment's own `Origin`. The API always accepts its own origin, so
+  `CLIENT_ORIGIN` only has to list origins that are *different* from the API
+  (a separate dev server, a preview URL).
 - For a production deployment, set `MONGODB_URI`, `JWT_ACCESS_SECRET`,
   `JWT_REFRESH_SECRET`, `NODE_ENV=production`, and `CLIENT_ORIGIN` in the
   Vercel project's environment variables. `CLIENT_ORIGIN` must exactly match
   the production site origin. Generate both JWT secrets independently (at least
   32 characters); never commit them or put them in frontend `VITE_` variables.
 - Configure an email and/or SMS provider before relying on OTP delivery.
+  Without one the API logs the code instead of sending it, so nobody can sign
+  in; `ALLOW_DEV_OTP=true` echoes it in the response for a preview deployment
+  (never for a public one — anyone who can call `send-otp` could sign in).
   Configure `GOOGLE_CLIENT_ID` / `VITE_GOOGLE_CLIENT_ID` or
   `APPLE_CLIENT_ID` / `VITE_APPLE_CLIENT_ID` only when enabling those providers.
+  The boot log states which of the three are inactive.
 - Set strong `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` (≥ 32 chars); production
   refuses to start without them.
 - Cookies are `httpOnly` with `secure` and `sameSite: 'none'` in production, so

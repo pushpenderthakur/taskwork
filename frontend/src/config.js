@@ -16,5 +16,14 @@ export const isGoogleConfigured =
 export const isAppleConfigured =
   APPLE_CLIENT_ID.length > 0 && !APPLE_CLIENT_ID.startsWith('your_');
 
-/** Empty string means "mock mode": the form simulates a delay and skips the API. */
-export const API_URL = import.meta.env.VITE_API_BASE_URL ?? '';
+/**
+ * Base URL of the auth API.
+ *
+ * Empty means "mock mode" (simulated round trip) in development. A production
+ * build always needs the real API, so it defaults to `/api/auth` on the current
+ * origin — the Vercel setup serves both from one domain. Without that default a
+ * forgotten `VITE_API_BASE_URL` would silently disable sign-in.
+ */
+const configuredApiBase = (import.meta.env.VITE_API_BASE_URL ?? '').trim();
+
+export const API_URL = configuredApiBase || (import.meta.env.PROD ? '/api/auth' : '');
