@@ -28,7 +28,7 @@ jobs:
           npm --prefix backend ci
           npm --prefix frontend ci
 
-      - name: Lint the SPA
+      - name: Lint the frontend and API
         run: npm run lint
 
       - name: Build the SPA

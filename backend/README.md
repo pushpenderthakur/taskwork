@@ -164,7 +164,8 @@ destination with a TTL index.
 ## Tests
 
 ```bash
-npm run test:smoke
+npm run lint        # ESLint (flat config, Node globals)
+npm run test:smoke  # end-to-end API suite
 ```
 
 Boots an in-memory MongoDB, starts the real app, and exercises the OTP, session

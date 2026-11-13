@@ -5,7 +5,6 @@
  *
  * Run with: npm run test:smoke
  */
-import assert from 'node:assert/strict';
 import http from 'node:http';
 import net from 'node:net';
 import { MongoMemoryServer } from 'mongodb-memory-server';

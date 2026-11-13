@@ -68,7 +68,7 @@ Run from the repository root:
 | `npm run dev:server` | Start the API with `node --watch`                     |
 | `npm run dev:all`  | Start API and SPA together                              |
 | `npm run build`    | Production build of the SPA into `frontend/dist`        |
-| `npm run lint`     | ESLint over the SPA                                     |
+| `npm run lint`     | ESLint over the frontend and API                        |
 | `npm run preview`  | Serve the built SPA                                     |
 | `npm run test:api` | API smoke suite (in-memory MongoDB, no services needed) |
 | `npm run test:ui`  | Headless-Chrome UI check against the running dev servers |
