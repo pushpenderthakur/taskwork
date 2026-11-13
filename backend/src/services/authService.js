@@ -90,23 +90,31 @@ export async function sendOtp({ method, identifier, isLogin, name }) {
 
   const code = generateOtpCode();
   const codeHash = await hashOtp(code);
-
-  await Otp.findOneAndUpdate(
-    { method, identifier: normalized },
-    {
-      $set: {
-        method,
-        identifier: normalized,
-        name: name?.trim() ? name.trim() : (existing?.name ?? null),
-        codeHash,
-        attempts: 0,
-        consumedAt: null,
-        expiresAt: otpExpiryDate(env.otpTtlSeconds),
-        lastSentAt: new Date(),
-      },
+  const update = {
+    $set: {
+      method,
+      identifier: normalized,
+      name: name?.trim() ? name.trim() : (existing?.name ?? null),
+      codeHash,
+      attempts: 0,
+      consumedAt: null,
+      expiresAt: otpExpiryDate(env.otpTtlSeconds),
+      lastSentAt: new Date(),
     },
-    { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true },
-  );
+  };
+
+  try {
+    await Otp.findOneAndUpdate(
+      { method, identifier: normalized },
+      update,
+      { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true },
+    );
+  } catch (error) {
+    // Two near-simultaneous requests (double click, two tabs) race on the unique
+    // index: the loser re-runs as a plain update instead of failing the request.
+    if (error?.code !== 11000) throw error;
+    await Otp.updateOne({ method, identifier: normalized }, update);
+  }
 
   let delivery;
   try {

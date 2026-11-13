@@ -53,6 +53,58 @@ async function appleIdentityToken({
     .sign(privateKey);
 }
 
+// A stub of Google's tokeninfo/userinfo endpoints, so the Google flow can be
+// exercised without a real Google account.
+const GOOGLE_CLIENT_ID = 'test-google-client.apps.googleusercontent.com';
+const GOOGLE_VALID_TOKEN = 'valid-google-access-token';
+const GOOGLE_WRONG_AUDIENCE_TOKEN = 'token-issued-for-another-client';
+
+const googleSink = http.createServer((req, res) => {
+  const url = new URL(req.url, 'http://127.0.0.1');
+  const json = (status, body) => {
+    res.writeHead(status, { 'content-type': 'application/json' });
+    res.end(JSON.stringify(body));
+  };
+
+  if (url.pathname === '/tokeninfo') {
+    const token = url.searchParams.get('access_token');
+    if (token === GOOGLE_VALID_TOKEN) {
+      return json(200, {
+        aud: GOOGLE_CLIENT_ID,
+        sub: 'google-sub-1',
+        scope: 'openid email profile',
+      });
+    }
+    if (token === GOOGLE_WRONG_AUDIENCE_TOKEN) {
+      return json(200, {
+        aud: 'some-other-client.apps.googleusercontent.com',
+        sub: 'google-sub-2',
+      });
+    }
+    return json(400, { error: 'invalid_token' });
+  }
+
+  if (url.pathname === '/userinfo') {
+    if (req.headers.authorization !== `Bearer ${GOOGLE_VALID_TOKEN}`) {
+      return json(401, { error: 'invalid_token' });
+    }
+    return json(200, {
+      sub: 'google-sub-1',
+      email: 'Google.User@Example.com',
+      email_verified: true,
+      name: 'Google User',
+    });
+  }
+
+  return json(404, { error: 'not_found' });
+});
+
+await new Promise((resolve) => googleSink.listen(0, '127.0.0.1', resolve));
+
+process.env.GOOGLE_CLIENT_ID = GOOGLE_CLIENT_ID;
+process.env.GOOGLE_TOKENINFO_URL = `http://127.0.0.1:${googleSink.address().port}/tokeninfo`;
+process.env.GOOGLE_USERINFO_URL = `http://127.0.0.1:${googleSink.address().port}/userinfo`;
+
 const mongod = await MongoMemoryServer.create();
 process.env.MONGODB_URI = mongod.getUri('taskwork-smoke');
 
@@ -358,13 +410,52 @@ try {
   check('short phone number is rejected', badPhone.status === 400, JSON.stringify(badPhone.json));
 
   // OAuth guards
-  const google = await call('/api/auth/google', { method: 'POST', body: { token: 'invalid-token-value' } });
+  const googleInvalid = await call('/api/auth/google', {
+    method: 'POST',
+    body: { token: 'not-a-real-access-token' },
+  });
   check(
-    'google rejects an invalid token',
-    google.status === 503
-      ? google.json?.error?.code === 'GOOGLE_NOT_CONFIGURED'
-      : google.status === 401 && google.json?.error?.code === 'INVALID_GOOGLE_TOKEN',
-    JSON.stringify(google.json),
+    'google rejects an unknown token',
+    googleInvalid.status === 401 && googleInvalid.json?.error?.code === 'INVALID_GOOGLE_TOKEN',
+    JSON.stringify(googleInvalid.json),
+  );
+
+  const googleWrongAudience = await call('/api/auth/google', {
+    method: 'POST',
+    body: { token: GOOGLE_WRONG_AUDIENCE_TOKEN },
+  });
+  check(
+    'google rejects a token issued for another app',
+    googleWrongAudience.status === 401 &&
+      googleWrongAudience.json?.error?.code === 'GOOGLE_TOKEN_AUDIENCE_MISMATCH',
+    JSON.stringify(googleWrongAudience.json),
+  );
+
+  const googleSignIn = await call('/api/auth/google', {
+    method: 'POST',
+    body: { token: GOOGLE_VALID_TOKEN },
+  });
+  check(
+    'google sign-in creates a session',
+    googleSignIn.status === 200 && Boolean(googleSignIn.json?.accessToken),
+    JSON.stringify(googleSignIn.json),
+  );
+  check(
+    'google profile is stored',
+    googleSignIn.json?.user?.email === 'google.user@example.com' &&
+      googleSignIn.json?.user?.name === 'Google User' &&
+      googleSignIn.json?.user?.providers?.google === true,
+    JSON.stringify(googleSignIn.json?.user),
+  );
+
+  const googleAgain = await call('/api/auth/google', {
+    method: 'POST',
+    body: { token: GOOGLE_VALID_TOKEN },
+  });
+  check(
+    'google repeat sign-in reuses the account',
+    googleAgain.status === 200 && googleAgain.json?.user?.id === googleSignIn.json?.user?.id,
+    JSON.stringify(googleAgain.json),
   );
 
   const apple = await call('/api/auth/apple', {
@@ -750,4 +841,5 @@ try {
   await new Promise((resolve) => server.close(resolve));
   await mongod.stop();
   await new Promise((resolve) => jwksServer.close(resolve));
+  await new Promise((resolve) => googleSink.close(resolve));
 }

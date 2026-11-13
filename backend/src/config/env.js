@@ -119,6 +119,15 @@ export const env = {
   otpMaxAttempts: readInt('OTP_MAX_ATTEMPTS', 5),
   otpResendCooldownSeconds: readInt('OTP_RESEND_COOLDOWN_SECONDS', 30),
   googleClientId: readString('GOOGLE_CLIENT_ID', ''),
+  // Overridable only so the Google verification flow can be tested offline.
+  googleTokenInfoUrl: readString(
+    'GOOGLE_TOKENINFO_URL',
+    'https://oauth2.googleapis.com/tokeninfo',
+  ),
+  googleUserInfoUrl: readString(
+    'GOOGLE_USERINFO_URL',
+    'https://www.googleapis.com/oauth2/v3/userinfo',
+  ),
   appleClientId: readString('APPLE_CLIENT_ID', ''),
   // Overridable only so the identity token flow can be tested offline.
   appleIssuer: readString('APPLE_ISSUER', 'https://appleid.apple.com'),

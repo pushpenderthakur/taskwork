@@ -88,7 +88,16 @@ api.interceptors.response.use(
   },
 );
 
-/** Server error message, or a caller-supplied fallback. */
+/** Server error message, a network hint, or a caller-supplied fallback. */
 export function apiErrorMessage(error, fallback) {
-  return error?.response?.data?.error?.message ?? fallback;
+  const serverMessage = error?.response?.data?.error?.message;
+  if (serverMessage) return serverMessage;
+
+  // No response at all means the API itself is unreachable (wrong URL, not
+  // running, or offline) — say so instead of "please try again".
+  if (error?.request && !error?.response) {
+    return `Cannot reach the API at ${API_URL || 'the configured URL'}. Is the server running?`;
+  }
+
+  return error?.message ?? fallback;
 }

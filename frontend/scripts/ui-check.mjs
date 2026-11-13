@@ -165,7 +165,7 @@ try {
     return true;
   })()`;
 
-  const devCodeFrom = (text) => text.match(/Development code:\s*(\d{6})/)?.[1] ?? null;
+  const devCodeFrom = (text) => text.match(/Development code[^:]*:\s*(\d{6})/i)?.[1] ?? null;
 
   await send('Page.enable');
   await send('Runtime.enable');
@@ -217,6 +217,19 @@ try {
 
   const code = devCodeFrom(stepTwo);
   check('development OTP is shown in the UI', Boolean(code), stepTwo.slice(0, 300));
+
+  // The resend button must start in its cooldown state instead of firing a 429.
+  const resendState = await evaluate(`(() => {
+    const button = [...document.querySelectorAll('button')].find(
+      (b) => b.textContent.includes('Resend code'),
+    );
+    return button ? { label: button.textContent.trim(), disabled: button.disabled } : null;
+  })()`);
+  check(
+    'resend shows the server cooldown',
+    Boolean(resendState) && resendState.disabled && /Resend code in \d+s/.test(resendState.label ?? ''),
+    JSON.stringify(resendState),
+  );
 
   await evaluate(setInput('input[name="otp"]', code));
   await sleep(200);

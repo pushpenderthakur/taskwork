@@ -11,8 +11,8 @@ import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { env } from '../config/env.js';
 import ApiError from '../utils/ApiError.js';
 
-const GOOGLE_TOKENINFO_URL = 'https://oauth2.googleapis.com/tokeninfo';
-const GOOGLE_USERINFO_URL = 'https://www.googleapis.com/oauth2/v3/userinfo';
+const GOOGLE_TOKENINFO_URL = env.googleTokenInfoUrl;
+const GOOGLE_USERINFO_URL = env.googleUserInfoUrl;
 
 // Cached JWKS for Apple, refreshed automatically when the keys rotate.
 const appleJwks = createRemoteJWKSet(new URL(env.appleJwksUrl));

@@ -6,7 +6,7 @@
  * call the OAuth routes directly. When `VITE_API_BASE_URL` is empty the form
  * runs in mock mode, which keeps the UI usable without a backend.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useGoogleLogin } from '@react-oauth/google';
 import { Mail, Phone, ShieldCheck, ArrowRight, Loader2 } from 'lucide-react';
 import { api, apiErrorMessage, saveSession } from '../api';
@@ -16,11 +16,28 @@ import { appleErrorMessage, signInWithApple } from '../apple';
 const SOCIAL_BUTTON_CLASS =
   'flex items-center justify-center gap-2 py-2.5 px-4 border border-slate-300 rounded-lg hover:bg-slate-50 transition text-sm font-medium text-slate-700';
 
+/** Maps Google Identity Services error codes to actionable text. */
+function googleErrorMessage(reason) {
+  switch (reason) {
+    case 'popup_closed_by_user':
+      return 'Google sign-in was cancelled.';
+    case 'popup_failed_to_open':
+    case 'popup_blocked':
+      return 'The Google popup was blocked. Allow popups for this site and try again.';
+    case 'token_initialization_failed':
+    case 'oauth_initialization_failed':
+      return 'Google sign-in is not allowed for this origin. Add it to the OAuth client’s authorized JavaScript origins.';
+    default:
+      return 'Google sign-in failed, please try again.';
+  }
+}
+
 // Rendered only when a Google client ID is configured, so the OAuth context exists.
 function GoogleButton({ onLogin }) {
   const login = useGoogleLogin({
     onSuccess: (tokenResponse) => onLogin(tokenResponse),
-    onError: () => onLogin(null),
+    // GIS reports why it failed; the parent turns the code into a message.
+    onError: (error) => onLogin({ error: error?.type ?? error?.error ?? 'unknown' }),
   });
 
   return (
@@ -44,6 +61,9 @@ export default function AuthForm({ onAuthenticated }) {
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [infoMsg, setInfoMsg] = useState('');
+  // Timestamp until which the server rejects a resend (30s by default).
+  const [resendAt, setResendAt] = useState(0);
+  const [now, setNow] = useState(() => Date.now());
 
   const [formData, setFormData] = useState({
     name: '',
@@ -82,6 +102,50 @@ export default function AuthForm({ onAuthenticated }) {
     return true;
   };
 
+  // Ticks once a second while a resend cooldown is running.
+  useEffect(() => {
+    if (!resendAt) return undefined;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [resendAt]);
+
+  const resendIn = Math.max(0, Math.ceil((resendAt - now) / 1000));
+
+  // Shared by the first send and the resend button.
+  const requestOtp = async () => {
+    const payload = {
+      method: authMethod,
+      identifier: authMethod === 'email' ? formData.email : formData.phone,
+      isLogin,
+      ...(isLogin ? {} : { name: formData.name }),
+    };
+
+    if (API_URL) {
+      const { data } = await api.post('/send-otp', payload);
+      const destination =
+        data.destination ?? (authMethod === 'email' ? 'your email' : 'your mobile number');
+      setInfoMsg('');
+      setSuccessMsg(
+        data.devCode
+          ? `Development code for ${destination}: ${data.devCode} (no ${
+              authMethod === 'email' ? 'email' : 'SMS'
+            } provider is configured).`
+          : `OTP sent to ${destination}.`,
+      );
+      // Mirror the server's resend cooldown so the button cannot trigger a 429.
+      setResendAt(Date.now() + (data.resendAfter ?? 30) * 1000);
+      setStep(2);
+      return;
+    }
+
+    // Mock mode: no backend configured, so simulate the round trip.
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    setStep(2);
+    setSuccessMsg(
+      `OTP sent to your ${authMethod === 'email' ? 'email' : 'mobile number'}.`,
+    );
+  };
+
   // Step 1: Send OTP Handler
   const handleSendOtp = async (e) => {
     e.preventDefault();
@@ -90,31 +154,7 @@ export default function AuthForm({ onAuthenticated }) {
     setLoading(true);
     setError('');
     try {
-      const payload = {
-        method: authMethod,
-        identifier: authMethod === 'email' ? formData.email : formData.phone,
-        isLogin,
-        ...(isLogin ? {} : { name: formData.name }),
-      };
-
-      if (API_URL) {
-        const { data } = await api.post('/send-otp', payload);
-        const destination = data.destination ?? (authMethod === 'email' ? 'your email' : 'your mobile number');
-        setInfoMsg('');
-        setSuccessMsg(
-          data.devCode
-            ? `OTP sent to ${destination}. Development code: ${data.devCode}`
-            : `OTP sent to ${destination}.`,
-        );
-        setStep(2);
-      } else {
-        // No backend configured, so simulate a delay for UI testing
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        setStep(2);
-        setSuccessMsg(
-          `OTP sent to your ${authMethod === 'email' ? 'email' : 'mobile number'}.`,
-        );
-      }
+      await requestOtp();
     } catch (err) {
       const code = err?.response?.data?.error?.code;
       const field = authMethod === 'email' ? 'email' : 'phone number';
@@ -134,6 +174,23 @@ export default function AuthForm({ onAuthenticated }) {
       }
 
       setError(apiErrorMessage(err, 'Could not send OTP, please try again.'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Step 2: Resend the code for the same destination.
+  const handleResend = async () => {
+    if (Date.now() < resendAt) return;
+
+    setLoading(true);
+    setError('');
+    try {
+      await requestOtp();
+      // The previous code is dead once a new one is issued.
+      setFormData((prev) => ({ ...prev, otp: '' }));
+    } catch (err) {
+      setError(apiErrorMessage(err, 'Could not resend the code, please try again.'));
     } finally {
       setLoading(false);
     }
@@ -176,7 +233,7 @@ export default function AuthForm({ onAuthenticated }) {
   };
 
   // Google OAuth (real flow when VITE_GOOGLE_CLIENT_ID is set).
-  // `tokenResponse` is null when the user closed the popup.
+  // A `tokenResponse` with an `error` field means the popup never completed.
   const handleGoogleLogin = async (tokenResponse) => {
     setError('');
     setInfoMsg('');
@@ -186,12 +243,21 @@ export default function AuthForm({ onAuthenticated }) {
       return;
     }
 
+    if (tokenResponse.error) {
+      setError(googleErrorMessage(tokenResponse.error));
+      return;
+    }
+
+    const accessToken = tokenResponse.access_token;
+    if (!accessToken) {
+      setError('Google did not return an access token. Check the OAuth client configuration.');
+      return;
+    }
+
     setLoading(true);
     try {
       if (API_URL) {
-        const { data } = await api.post('/google', {
-          token: tokenResponse.access_token,
-        });
+        const { data } = await api.post('/google', { token: accessToken });
         saveSession(data);
         onAuthenticated?.(data.user);
         return;
@@ -408,13 +474,31 @@ export default function AuthForm({ onAuthenticated }) {
               {loading ? <Loader2 className="animate-spin" size={18} /> : 'Verify & Continue'}
             </button>
 
-            <button
-              type="button"
-              onClick={() => { setStep(1); setSuccessMsg(''); setError(''); }}
-              className="w-full text-sm text-slate-500 hover:text-slate-800 py-1"
-            >
-              ← Change {authMethod === 'email' ? 'Email' : 'Phone Number'}
-            </button>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={handleResend}
+                disabled={loading || resendIn > 0}
+                className="w-full text-sm text-blue-600 hover:underline py-1 disabled:text-slate-400 disabled:no-underline"
+              >
+                {loading ? (
+                  <span className="inline-flex items-center justify-center gap-2">
+                    <Loader2 className="animate-spin" size={14} /> Sending
+                  </span>
+                ) : resendIn > 0 ? (
+                  `Resend code in ${resendIn}s`
+                ) : (
+                  'Resend code'
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setStep(1); setSuccessMsg(''); setError(''); }}
+                className="w-full text-sm text-slate-500 hover:text-slate-800 py-1"
+              >
+                ← Change {authMethod === 'email' ? 'Email' : 'Phone Number'}
+              </button>
+            </div>
           </form>
         )}
 
