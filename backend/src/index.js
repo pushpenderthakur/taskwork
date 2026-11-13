@@ -12,6 +12,9 @@ import { isEmailDeliveryConfigured } from './utils/mailer.js';
 // Held so shutdown can close the listener.
 let server;
 
+const app = createApp();
+export default app;
+
 /**
  * Reports settings that would make sign-in silently impossible (no transport in
  * production, dev OTP left on) or that simply disable a provider.
@@ -44,7 +47,6 @@ async function start() {
   await connectDb();
   await ensureIndexes();
 
-  const app = createApp();
   server = app.listen(env.port, () => {
     console.log(`[api] listening on http://localhost:${env.port} (${env.nodeEnv})`);
     console.log(`[api] CORS origin: ${env.clientOrigin}`);
@@ -65,21 +67,23 @@ async function shutdown(signal) {
   process.exit(0);
 }
 
-process.on('SIGINT', () => shutdown('SIGINT'));
-process.on('SIGTERM', () => shutdown('SIGTERM'));
+if (!process.env.VERCEL) {
+  process.on('SIGINT', () => shutdown('SIGINT'));
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
 
-start().catch(async (error) => {
-  console.error('[api] failed to start:', error?.message ?? error);
+  start().catch(async (error) => {
+    console.error('[api] failed to start:', error?.message ?? error);
 
-  // A connection error is the common case; point at the fix.
-  const isDatabaseError =
-    error?.name === 'MongooseServerSelectionError' || /mongodb/i.test(String(error?.message));
-  if (isDatabaseError) {
-    console.error(
-      '[api] Could not reach MongoDB. Check MONGODB_URI in backend/.env, or run `docker compose up -d` from the repo root.',
-    );
-  }
+    // A connection error is the common case; point at the fix.
+    const isDatabaseError =
+      error?.name === 'MongooseServerSelectionError' || /mongodb/i.test(String(error?.message));
+    if (isDatabaseError) {
+      console.error(
+        '[api] Could not reach MongoDB. Check MONGODB_URI in backend/.env, or run `docker compose up -d` from the repo root.',
+      );
+    }
 
-  await disconnectDb().catch(() => {});
-  process.exit(1);
-});
+    await disconnectDb().catch(() => {});
+    process.exit(1);
+  });
+}

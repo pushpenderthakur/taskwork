@@ -117,7 +117,10 @@ export const env = {
   isProduction: nodeEnv === 'production',
   port,
   backendRoot,
-  mongoUri: readString('MONGODB_URI', 'mongodb://127.0.0.1:27017/taskwork'),
+  mongoUri: readString(
+    'MONGODB_URI',
+    nodeEnv === 'production' ? '' : 'mongodb://127.0.0.1:27017/taskwork',
+  ),
   clientOrigin: readString('CLIENT_ORIGIN', 'http://localhost:5173'),
   accessTokenSecret: readSecret('JWT_ACCESS_SECRET', { devFallbackLabel: 'access token secret' }),
   refreshTokenSecret: readSecret('JWT_REFRESH_SECRET', { devFallbackLabel: 'refresh token secret' }),

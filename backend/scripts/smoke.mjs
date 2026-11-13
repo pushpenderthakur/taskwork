@@ -108,8 +108,12 @@ process.env.GOOGLE_USERINFO_URL = `http://127.0.0.1:${googleSink.address().port}
 const mongod = await MongoMemoryServer.create();
 process.env.MONGODB_URI = mongod.getUri('taskwork-smoke');
 
-const { connectDb, disconnectDb } = await import('../src/config/db.js');
-const { createApp } = await import('../src/app.js');
+const { disconnectDb } = await import('../src/config/db.js');
+const previousVercelValue = process.env.VERCEL;
+process.env.VERCEL = '1';
+const { default: app } = await import('../src/index.js');
+if (previousVercelValue === undefined) delete process.env.VERCEL;
+else process.env.VERCEL = previousVercelValue;
 const { Otp } = await import('../src/models/Otp.js');
 const { generateOtpCode } = await import('../src/utils/otp.js');
 const { accessCookieOptions } = await import('../src/utils/tokens.js');
@@ -126,8 +130,6 @@ console.info = (...args) => {
   originalInfo(...args);
 };
 
-await connectDb({ attempts: 1 });
-const app = createApp();
 const server = app.listen(0);
 await new Promise((resolve) => server.once('listening', resolve));
 const baseUrl = `http://127.0.0.1:${server.address().port}`;
@@ -226,6 +228,23 @@ function cookieHeader(setCookie) {
 
 try {
   console.log('\nAuth API smoke test\n');
+
+  const coldHealth = await call('/api/health');
+  check(
+    'health is available before the database connects',
+    coldHealth.status === 200 && coldHealth.json.database === 'disconnected',
+  );
+
+  const lazyConnection = await call('/api/auth/send-otp', {
+    method: 'POST',
+    body: {
+      method: 'email',
+      identifier: 'lazy.connection@example.com',
+      isLogin: false,
+    },
+    origin: 'http://localhost:5173',
+  });
+  check('first auth request connects the database', lazyConnection.status === 202);
 
   const health = await call('/api/health');
   check('health endpoint returns ok', health.status === 200 && health.json?.status === 'ok');
@@ -934,6 +953,20 @@ try {
   Object.assign(env.sms, previousSms);
   Object.assign(env.twilio, previousTwilio);
   await new Promise((resolve) => smsSink.close(resolve));
+
+  const configuredMongoUri = appEnv.mongoUri;
+  await disconnectDb();
+  appEnv.mongoUri = '';
+  const missingDatabase = await call('/api/auth/google', {
+    method: 'POST',
+    body: { token: 'unverified' },
+  });
+  check(
+    'auth reports missing production database configuration',
+    missingDatabase.status === 503 &&
+      missingDatabase.json?.error?.code === 'DATABASE_NOT_CONFIGURED',
+  );
+  appEnv.mongoUri = configuredMongoUri;
 
   const failed = results.filter((result) => !result.ok);
   console.log(`\n${results.length - failed.length}/${results.length} checks passed\n`);

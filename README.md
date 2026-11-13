@@ -128,6 +128,9 @@ to override).
   Set `VITE_API_BASE_URL=/api/auth` in Vercel so browser requests use that API.
   (A production build already defaults to `/api/auth` when the variable is
   missing, so a forgotten value cannot silently disable sign-in.)
+- The Express app is exported for Vercel's serverless runtime and connects to
+  MongoDB on the first API request. `/api/health` reports database connectivity
+  without requiring the database to be available.
 - Because the SPA and the API then share a domain, requests carry the
   deployment's own `Origin`. The API always accepts its own origin, so
   `CLIENT_ORIGIN` only has to list origins that are *different* from the API

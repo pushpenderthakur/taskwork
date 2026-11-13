@@ -10,11 +10,29 @@ import cors from 'cors';
 import express from 'express';
 import helmet from 'helmet';
 import mongoose from 'mongoose';
+import { connectDb, ensureIndexes } from './config/db.js';
 import { env } from './config/env.js';
 import ApiError from './utils/ApiError.js';
 import { errorHandler, notFoundHandler } from './middleware/error.js';
 import { globalLimiter } from './middleware/rateLimiters.js';
 import authRoutes from './routes/auth.js';
+
+let databaseInitialization;
+
+async function ensureDatabaseReady() {
+  if (mongoose.connection.readyState === 1) return;
+  if (!env.mongoUri) throw new Error('MONGODB_URI is not configured.');
+
+  if (!databaseInitialization) {
+    databaseInitialization = connectDb({ attempts: 1 })
+      .then(ensureIndexes)
+      .finally(() => {
+        databaseInitialization = null;
+      });
+  }
+
+  await databaseInitialization;
+}
 
 // `CLIENT_ORIGIN` is a comma-separated allow-list for browser origins.
 const ALLOWED_ORIGINS = env.clientOrigin
@@ -108,6 +126,24 @@ export function createApp() {
             : 'disconnected',
       uptimeSeconds: Math.round(process.uptime()),
     });
+  });
+
+  app.use('/api', async (_req, _res, next) => {
+    try {
+      await ensureDatabaseReady();
+      next();
+    } catch (error) {
+      console.error(`[api] database unavailable: ${error?.message ?? error}`);
+      next(
+        new ApiError(
+          503,
+          env.mongoUri ? 'DATABASE_UNAVAILABLE' : 'DATABASE_NOT_CONFIGURED',
+          env.mongoUri
+            ? 'Authentication is temporarily unavailable because the database connection failed.'
+            : 'Authentication is temporarily unavailable because the database is not configured.',
+        ),
+      );
+    }
   });
 
   // Everything under /api shares the global limit; auth routes add their own.
