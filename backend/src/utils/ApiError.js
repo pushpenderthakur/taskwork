@@ -47,6 +47,10 @@ export default class ApiError extends Error {
     return new ApiError(409, code, message);
   }
 
+  static forbidden(code, message) {
+    return new ApiError(403, code, message);
+  }
+
   static tooManyRequests(message = 'Too many requests, please try again later.') {
     return new ApiError(429, 'RATE_LIMITED', message);
   }

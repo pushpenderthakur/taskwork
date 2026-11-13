@@ -10,4 +10,13 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  server: {
+    // The API only trusts CLIENT_ORIGIN (default http://localhost:5173). Letting
+    // Vite fall back to 5174 when the port is taken would make every API call
+    // fail CORS, so fail loudly instead.
+    strictPort: true,
+  },
+  preview: {
+    strictPort: true,
+  },
 });

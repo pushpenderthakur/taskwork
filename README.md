@@ -79,7 +79,7 @@ Run from the repository root:
 ## Tests
 
 ```bash
-npm run test:api    # 69 checks: OTP, sessions, Apple, Gmail, Twilio, guards
+npm run test:api    # 73 checks: OTP, sessions, Apple, Gmail, Twilio, CORS, guards
 npm run test:ui     # 15 checks: register, OTP resend, sign-out, phone sign-in
 ```
 
@@ -99,7 +99,11 @@ to override).
   the SPA and the API must be served from the same site (e.g.
   `app.example.com` and `api.example.com` share `example.com`), over HTTPS.
 - `CLIENT_ORIGIN` is the CORS allow-list; list every browser origin, comma
-  separated.
+  separated. Origins that are not listed get a `403 ORIGIN_NOT_ALLOWED`, so a dev
+  server on an unexpected port fails fast instead of silently breaking every call.
+- The dev server pins port 5173 (`server.strictPort`) because that is what
+  `CLIENT_ORIGIN` allows by default; free the port rather than letting Vite fall
+  back to 5174.
 - The API sets a CSP that allows the Google and Apple SDKs. Whatever serves the
   built SPA must send the same policy, otherwise the social buttons are blocked
   by the browser.

@@ -234,6 +234,44 @@ try {
   const noToken = await call('/api/auth/me');
   check('GET /me without token is 401', noToken.status === 401, `status ${noToken.status}`);
 
+  // Browsers only ever send `Origin` cross-origin. Origins outside CLIENT_ORIGIN
+  // must be refused with a 403 rather than the 500 a throwing cors callback gives.
+  const allowedOrigin = process.env.CLIENT_ORIGIN;
+  const badOrigin = await fetch(`${baseUrl}/api/health`, {
+    headers: { origin: 'http://localhost:5174' },
+  });
+  const badOriginBody = await badOrigin.json().catch(() => null);
+  check(
+    'an unlisted origin is 403 ORIGIN_NOT_ALLOWED',
+    badOrigin.status === 403 && badOriginBody?.error?.code === 'ORIGIN_NOT_ALLOWED',
+    `status ${badOrigin.status} ${JSON.stringify(badOriginBody)}`,
+  );
+
+  const badPreflight = await fetch(`${baseUrl}/api/auth/send-otp`, {
+    method: 'OPTIONS',
+    headers: {
+      origin: 'http://localhost:5174',
+      'access-control-request-method': 'POST',
+      'access-control-request-headers': 'content-type',
+    },
+  });
+  check(
+    'a preflight from an unlisted origin is 403',
+    badPreflight.status === 403,
+    `status ${badPreflight.status}`,
+  );
+
+  const goodOrigin = await fetch(`${baseUrl}/api/health`, { headers: { origin: allowedOrigin } });
+  check(
+    'a listed origin keeps its CORS header',
+    goodOrigin.status === 200 &&
+      goodOrigin.headers.get('access-control-allow-origin') === allowedOrigin,
+    `status ${goodOrigin.status} allow-origin ${goodOrigin.headers.get('access-control-allow-origin')}`,
+  );
+
+  const noOrigin = await fetch(`${baseUrl}/api/health`);
+  check('a request without an Origin is allowed', noOrigin.status === 200, `status ${noOrigin.status}`);
+
   const unknownLogin = await call('/api/auth/send-otp', {
     method: 'POST',
     body: { method: 'email', identifier: 'ghost@example.com', isLogin: true },

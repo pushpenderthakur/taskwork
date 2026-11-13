@@ -11,6 +11,7 @@ import express from 'express';
 import helmet from 'helmet';
 import mongoose from 'mongoose';
 import { env } from './config/env.js';
+import ApiError from './utils/ApiError.js';
 import { errorHandler, notFoundHandler } from './middleware/error.js';
 import { globalLimiter } from './middleware/rateLimiters.js';
 import authRoutes from './routes/auth.js';
@@ -46,6 +47,19 @@ function securityHeaders() {
   });
 }
 
+// Browsers attach `Origin` to every cross-origin request. Reject origins that are
+// not on the allow-list here, so they get a 403 instead of the 500 that `cors`
+// would produce when its callback receives an error (with a stack trace in the log).
+function originGuard(req, res, next) {
+  const origin = req.headers.origin;
+  if (origin && !ALLOWED_ORIGINS.includes(origin)) {
+    return next(
+      ApiError.forbidden('ORIGIN_NOT_ALLOWED', `Origin ${origin} is not allowed by CORS.`),
+    );
+  }
+  next();
+}
+
 export function createApp() {
   const app = express();
 
@@ -54,13 +68,11 @@ export function createApp() {
   app.set('trust proxy', 1);
 
   app.use(securityHeaders());
+  app.use(originGuard);
   app.use(
     cors({
-      origin(origin, callback) {
-        // Same-origin / curl requests arrive without an Origin header.
-        if (!origin || ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
-        return callback(new Error(`Origin ${origin} is not allowed by CORS.`));
-      },
+      // Allow-list: the request origin is echoed back for matches only.
+      origin: ALLOWED_ORIGINS,
       // Required for the cookie-based session endpoints.
       credentials: true,
     }),

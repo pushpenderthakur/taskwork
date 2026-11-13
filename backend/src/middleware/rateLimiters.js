@@ -27,10 +27,18 @@ function tooMany(message) {
   };
 }
 
+/**
+ * CORS preflights never reach a route handler, so counting them would let
+ * browser-generated `OPTIONS` requests burn the quota of the request that
+ * follows. Skipping them keeps the limits about real attempts.
+ */
+const skipPreflight = (req) => req.method === 'OPTIONS';
+
 /** Every `/api` request. */
 export const globalLimiter = rateLimit({
   windowMs: FIFTEEN_MINUTES,
   limit: LIMITS.global,
+  skip: skipPreflight,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   message: tooMany('Too many requests. Please slow down.'),
@@ -40,6 +48,7 @@ export const globalLimiter = rateLimit({
 export const sendOtpLimiter = rateLimit({
   windowMs: TEN_MINUTES,
   limit: LIMITS.sendOtp,
+  skip: skipPreflight,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   message: tooMany('Too many OTP requests. Please try again later.'),
@@ -49,6 +58,7 @@ export const sendOtpLimiter = rateLimit({
 export const verifyOtpLimiter = rateLimit({
   windowMs: TEN_MINUTES,
   limit: LIMITS.verifyOtp,
+  skip: skipPreflight,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   message: tooMany('Too many verification attempts. Please try again later.'),
@@ -58,6 +68,7 @@ export const verifyOtpLimiter = rateLimit({
 export const oauthLimiter = rateLimit({
   windowMs: TEN_MINUTES,
   limit: LIMITS.oauth,
+  skip: skipPreflight,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   message: tooMany('Too many social sign-in attempts. Please try again later.'),
