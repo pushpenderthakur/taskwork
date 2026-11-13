@@ -93,6 +93,17 @@ to override).
 
 ## Deployment notes
 
+- The repository includes a Vercel Services configuration: `/api/*` routes to
+  the Express API and all other paths route to the Vite SPA on the same domain.
+  Set `VITE_API_BASE_URL=/api/auth` in Vercel so browser requests use that API.
+- For a production deployment, set `MONGODB_URI`, `JWT_ACCESS_SECRET`,
+  `JWT_REFRESH_SECRET`, `NODE_ENV=production`, and `CLIENT_ORIGIN` in the
+  Vercel project's environment variables. `CLIENT_ORIGIN` must exactly match
+  the production site origin. Generate both JWT secrets independently (at least
+  32 characters); never commit them or put them in frontend `VITE_` variables.
+- Configure an email and/or SMS provider before relying on OTP delivery.
+  Configure `GOOGLE_CLIENT_ID` / `VITE_GOOGLE_CLIENT_ID` or
+  `APPLE_CLIENT_ID` / `VITE_APPLE_CLIENT_ID` only when enabling those providers.
 - Set strong `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` (≥ 32 chars); production
   refuses to start without them.
 - Cookies are `httpOnly` with `secure` and `sameSite: 'none'` in production, so
